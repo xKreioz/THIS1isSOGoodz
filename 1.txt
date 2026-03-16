@@ -1,0 +1,240 @@
+Webpro2 labtest1
+
+cd.. ออก
+cd ชื่อ เข้า
+ctrl+c หยุดการทำงาน
+node ชื่อ.js ทำงาน
+
+http://localhost:${port}/api-docs หน้าswagger
+
+
+1.Rest API
+	1. คำสั่ง ก่อนเริ่ม
+	npm init - สร้างpackage.json + enterรัวๆจนจบ ไม่มีผลไร
+	npm i express - ลง library
+	npm i swagger-ui-express
+	npm i yamljs
+	
+	2. สร้างไฟล์ ชื่อ.js - ไฟล์ server
+	3. import library เข้ามาให้หมด
+	const express = require("express");
+	const swagger = require("swagger-ui-express");
+	const yaml = require("yamljs");
+
+ตัวอย่างcode lab1
+
+app.js
+const express = require("express");
+const swagger = require("swagger-ui-express");
+const yaml = require("yamljs");
+
+const path = require('path');
+const app = express();
+const port = 8000;
+
+app.use(express.json());
+const swaggerDocument = yaml.load(path.join(__dirname, 'swagger.yaml'));
+app.use('/api', swagger.serve, swagger.setup(swaggerDocument));
+
+//info
+let bookky = [
+    {id: 1, name: "vivi", price: 20},
+    {id: 2, name: "phai", price: 100},
+    {id: 3, name: "meiji", price: 3000}
+]
+let counter = 4 //นับidเพื่อใส่ข้อมูลเพิ่ม
+
+app.post('/bookky', (req, res) =>{
+    let newbookky = req.body;
+    if(!newbookky.name || !newbookky.price){
+        return res.status(400).json({message: 'ใส่ให้ถูกนะเว่ย'});
+    }
+    newbookky.id = counter++ ;
+    bookky.push(newbookky);
+    res.status(201).json({message: 'เก่งมากเสร็จแล้ว'}); 
+})
+
+app.get('/bookky', (req, res)=>{
+    const booklist = bookky.map(book => {
+        return {
+            id: book.id, name: book.name, price: book.price
+        }
+    })
+
+    const sort = req.query.sort;
+    if(sort == 'true'){
+        booklist.sort();
+    }
+    
+    res.status(200).json(booklist)
+})
+
+app.put('/bookky/:id', (req, res) => {
+    let id = Number(req.params.id);
+    let updatebookky = req.body;
+    let index = bookky.findIndex(t => t.id === id);
+
+    if (index === -1) {
+        return res.status(404).json({ message: "book not found" });
+    }
+
+    bookky[index].name = updatebookky.name || bookky[index].name;
+    bookky[index].price = updatebookky.price || bookky[index].price;
+    
+    res.json({
+        message: "Update toy complete",
+        data: bookky[index]
+    });
+});
+
+app.delete('/bookky/:id', (req, res) => {
+    let id = Number(req.params.id);
+    let index = bookky.findIndex(t => t.id === id);
+
+    if (index === -1) {
+        return res.status(404).json({ message: "book not found" });
+    }
+
+    bookky.splice(index, 1);
+
+    res.status(200).json({
+        message: "Deleted book from inventory successfully",
+        indexDeleted: index
+    });
+});
+
+
+app.get('/search', (req, res) => {
+    const name = req.query.name;
+    
+    let results = bookky.filter(t => t.name.includes(name));
+
+    if (results.length === 0) {
+        return res.status(404).json({ message: 'หาไม่เจอจ้า' });
+    }
+
+    res.status(200).json({ message: 'เจอแล้วจร้า', data: results });
+});
+
+
+app.listen(
+    port, () => {
+        console.log('รันอยู่นะ')
+    }
+)
+
+swagger.yaml
+
+Define (เขียนไฟล์ YAML) -> Visualize (แปลงเป็นหน้าเว็บ) -> Execute (กดปุ่มยิง API ของจริง)
+
+1. ตั้งชื่อ + กำหนดที่อยู่ 
+openapi: 3.0.0
+info:
+  title: Bookky API ของเบส
+  description: ระบบจัดการหนังสือสุดจ๊าบ มีระบบค้นหาและเพิ่มข้อมูล
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: เครื่องของฉันเอง (Localhost)
+
+2.กำหนดcomponents เราจะสร้างโครงสร้างข้อมูลเตรียมไว้ เพื่อจะได้ไม่ต้องเขียนซ้ำๆ ครับ
+
+components:
+  schemas:
+    # แม่พิมพ์สำหรับตอนส่งข้อมูลเข้าไปเพิ่ม (POST, PUT)
+    BookInput:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        name:
+          type: string
+          example: "แฮร์รี่ พอตเตอร์"
+        price:
+          type: number
+          example: 500
+
+3.เส้นทางทั้งหมด paths ต่างๆ เราจะเอา Route ทั้งหมดที่เบสเขียนไว้มาแปะให้ตรงกันเป๊ะๆ ทั้งตัวพารามิเตอร์และข้อความตอนส่งกลับ (Response)
+
+paths:
+  # ----------------------------------------
+  # จัดการข้อมูลทั้งหมด (/bookky)
+  # ----------------------------------------
+  /bookky:
+    get:
+      summary: ดึงข้อมูลหนังสือทั้งหมด
+      parameters:
+        - in: query
+          name: sort
+          schema:
+            type: string
+          description: พิมพ์คำว่า 'true' ถ้าอยากให้เรียงข้อมูล
+      responses:
+        '200':
+          description: ดึงข้อมูลสำเร็จจร้า
+    
+    post:
+      summary: เพิ่มหนังสือเล่มใหม่
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookInput'
+      responses:
+        '201':
+          description: เก่งมากเสร็จแล้ว (เพิ่มข้อมูลสำเร็จ)
+        '400':
+          description: ใส่ให้ถูกนะเว่ย (ส่งข้อมูลมาไม่ครบ)
+
+  # ----------------------------------------
+  # จัดการข้อมูลรายเล่ม (/bookky/{id})
+  # ----------------------------------------
+  /bookky/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ระบุ ID ของหนังสือที่ต้องการจัดการ
+
+    put:
+      summary: แก้ไขข้อมูลหนังสือ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookInput'
+      responses:
+        '200':
+          description: Update toy complete
+        '404':
+          description: book not found
+
+    delete:
+      summary: ลบหนังสือทิ้ง
+      responses:
+        '200':
+          description: Deleted book from inventory successfully
+        '404':
+          description: book not found
+
+  # ----------------------------------------
+  # ระบบค้นหา (/search)
+  # ----------------------------------------
+  /search:
+    get:
+      summary: ค้นหาหนังสือจากชื่อ
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+          description: พิมพ์ชื่อหนังสือที่ต้องการหา
+      responses:
+        '200':
+          description: เจอแล้วจร้า
