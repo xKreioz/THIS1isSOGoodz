@@ -1,47 +1,106 @@
 openapi: 3.0.0
 info:
-  title: Homework Auth API
+  title: Bookky API ของเบส
+  description: ระบบจัดการหนังสือสุดจ๊าบ มีระบบค้นหาและเพิ่มข้อมูล
   version: 1.0.0
-  description: ระบบ Authentication ด้วย JWT ตามโจทย์การบ้าน
+
+servers:
+  - url: http://localhost:8000
+    description: เครื่องของฉันเอง (Localhost)
+
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+  schemas:
+    # แม่พิมพ์สำหรับตอนส่งข้อมูลเข้าไปเพิ่ม (POST, PUT)
+    BookInput:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        name:
+          type: string
+          example: "แฮร์รี่ พอตเตอร์"
+        price:
+          type: number
+          example: 500
+
 paths:
-  /login:
+  # ----------------------------------------
+  # จัดการข้อมูลทั้งหมด (/bookky)
+  # ----------------------------------------
+  /bookky:
+    get:
+      summary: ดึงข้อมูลหนังสือทั้งหมด
+      parameters:
+        - in: query
+          name: sort
+          schema:
+            type: string
+          description: พิมพ์คำว่า 'true' ถ้าอยากให้เรียงข้อมูล
+      responses:
+        '200':
+          description: ดึงข้อมูลสำเร็จจร้า
+    
     post:
-      summary: ส่ง Username เพื่อรับ Token
+      summary: เพิ่มหนังสือเล่มใหม่
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                  example: "admin"
+              $ref: '#/components/schemas/BookInput'
+      responses:
+        '201':
+          description: เก่งมากเสร็จแล้ว (เพิ่มข้อมูลสำเร็จ)
+        '400':
+          description: ใส่ให้ถูกนะเว่ย (ส่งข้อมูลมาไม่ครบ)
+
+  # ----------------------------------------
+  # จัดการข้อมูลรายเล่ม (/bookky/{id})
+  # ----------------------------------------
+  /bookky/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: ระบุ ID ของหนังสือที่ต้องการจัดการ
+
+    put:
+      summary: แก้ไขข้อมูลหนังสือ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookInput'
       responses:
         '200':
-          description: เข้าสู่ระบบสำเร็จ ได้รับ Token
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  token:
-                    type: string
-  /admin-only:
+          description: Update toy complete
+        '404':
+          description: book not found
+
+    delete:
+      summary: ลบหนังสือทิ้ง
+      responses:
+        '200':
+          description: Deleted book from inventory successfully
+        '404':
+          description: book not found
+
+  # ----------------------------------------
+  # ระบบค้นหา (/search)
+  # ----------------------------------------
+  /search:
     get:
-      summary: เข้าถึงหน้าแดชบอร์ดของ Admin
-      security:
-        - bearerAuth: []
+      summary: ค้นหาหนังสือจากชื่อ
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+          description: พิมพ์ชื่อหนังสือที่ต้องการหา
       responses:
         '200':
-          description: ยืนยันตัวตนผ่านและเป็น Admin
-        '401':
-          description: ไม่ได้ส่ง Token ใน Header
-        '403':
-          description: ส่ง Token แต่ไม่ใช่ Admin หรือ Token ไม่ถูกต้อง
+          description: เจอแล้วจร้า

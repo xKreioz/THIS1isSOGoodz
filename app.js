@@ -1,62 +1,106 @@
-const express = require('express');
-const jwt = require('jsonwebtoken'); 
-const swaggerUi = require('swagger-ui-express');
-const YAML = require('yamljs');
+const express = require("express");
+const swagger = require("swagger-ui-express");
+const yaml = require("yamljs");
 
+const path = require('path');
 const app = express();
+const port = 8000;
+
 app.use(express.json());
+const swaggerDocument = yaml.load(path.join(__dirname, 'swagger.yaml'));
+app.use('/api', swagger.serve, swagger.setup(swaggerDocument));
 
-const SECRET_KEY = 'my_secret_key';
+//info
+let bookky = [
+    {id: 1, name: "vivi", price: 20},
+    {id: 2, name: "phai", price: 100},
+    {id: 3, name: "meiji", price: 3000}
+]
+let counter = 4 //นับidเพื่อใส่ข้อมูลเพิ่ม
 
-// 1. โหลดไฟล์ swagger.yaml มาใช้งาน
-const swaggerDocument = YAML.load('./swagger.yaml');
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-
-// 2. Route /login สำหรับขอ Token [cite: 515]
-app.post('/login', (req, res) => {
-    const { username } = req.body; // Accepts username [cite: 516]
-    
-    // ถ้า username คือ "admin" ให้ sign token ด้วย payload { role: 'admin' } [cite: 517]
-    // ถ้าไม่ใช่ ให้ sign token ด้วย payload { role: 'user' } [cite: 518]
-    const payload = username === 'admin' ? { role: 'admin' } : { role: 'user' };
-    
-    const token = jwt.sign(payload, SECRET_KEY, { expiresIn: '1h' });
-    res.json({ token }); // Return the token to the client [cite: 519]
-});
-
-// 3. Authentication Middleware [cite: 520]
-const authenticateToken = (req, res, next) => {
-    // Extracts the token from the Authorization: Bearer <token> header [cite: 521]
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    
-    if (!token) return res.status(401).json({ message: 'Unauthorized: ไม่พบ Token' });
-
-    // Verifies the token. If valid, attach the payload to req.user [cite: 522]
-    jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) return res.status(403).json({ message: 'Forbidden: Token ไม่ถูกต้อง' });
-        req.user = user;
-        next();
-    });
-};
-
-// 4. Authorization Middleware (checkAdmin) [cite: 523]
-const checkAdmin = (req, res, next) => {
-    // Checks if req.user.role is exactly 'admin' [cite: 524]
-    if (req.user.role !== 'admin') {
-        // If not, return status 403 Forbidden [cite: 525]
-        return res.status(403).json({ message: 'Forbidden: สำหรับ Admin เท่านั้น' });
+app.post('/bookky', (req, res) =>{
+    let newbookky = req.body;
+    if(!newbookky.name || !newbookky.price){
+        return res.status(400).json({message: 'ใส่ให้ถูกนะเว่ย'});
     }
-    next();
-};
+    newbookky.id = counter++ ;
+    bookky.push(newbookky);
+    res.status(201).json({message: 'เก่งมากเสร็จแล้ว'}); 
+})
 
-// 5. Protected route /admin-only that uses both middlewares [cite: 526]
-app.get('/admin-only', authenticateToken, checkAdmin, (req, res) => {
-    res.json({ message: 'Welcome Admin!' });
+app.get('/bookky', (req, res)=>{
+    const booklist = bookky.map(book => {
+        return {
+            id: book.id, name: book.name, price: book.price
+        }
+    })
+
+    const sort = req.query.sort;
+    if(sort == 'true'){
+        booklist.sort();
+    }
+    
+    res.status(200).json(booklist)
+})
+
+app.put('/bookky/:id', (req, res) => {
+    let id = Number(req.params.id);
+    let updatebookky = req.body;
+    let index = bookky.findIndex(t => t.id === id);
+
+    if (index === -1) {
+        return res.status(404).json({ message: "book not found" });
+    }
+
+    bookky[index].name = updatebookky.name || bookky[index].name;
+    bookky[index].price = updatebookky.price || bookky[index].price;
+    
+    res.json({
+        message: "Update book complete",
+        data: bookky[index]
+    });
 });
 
-// เริ่มเซิร์ฟเวอร์
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
-    console.log('http://localhost:3000/api-docs');
+app.delete('/bookky/:id', (req, res) => {
+    let id = Number(req.params.id);
+    let index = bookky.findIndex(t => t.id === id);
+
+    if (index === -1) {
+        return res.status(404).json({ message: "book not found" });
+    }
+
+    bookky.splice(index, 1);
+
+    res.status(200).json({
+        message: "Deleted book from inventory successfully",
+        indexDeleted: index
+    });
 });
+
+
+// app.get('/search', (req, res) => {
+//     const name = req.query.name;
+//     let Name = bookky.find(t => t.name === name)
+
+//     res.status(200).json({message: 'เจอแล้วจร้า',data: Name});
+// });
+
+app.get('/search', (req, res) => {
+    const name = req.query.name;
+    
+    // เปลี่ยนจาก .find() เป็น .filter() และใช้ .includes()
+    let results = bookky.filter(t => t.name.includes(name));
+
+    if (results.length === 0) {
+        return res.status(404).json({ message: 'หาไม่เจอจ้า' });
+    }
+
+    res.status(200).json({ message: 'เจอแล้วจร้า', data: results });
+});
+
+
+app.listen(
+    port, () => {
+        console.log('กูกำลังรันอยู่นะ')
+    }
+)
