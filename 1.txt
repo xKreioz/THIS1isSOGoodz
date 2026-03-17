@@ -5,6 +5,8 @@ cd ชื่อ เข้า
 ctrl+c หยุดการทำงาน
 node ชื่อ.js ทำงาน
 
+how to Node.js Express create API GET /search
+
 http://localhost:${port}/api-docs หน้าswagger
 
 
